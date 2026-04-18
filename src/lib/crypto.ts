@@ -75,7 +75,7 @@ export async function loadStoredKey(): Promise<CryptoKey | null> {
   if (inMemoryKey) return inMemoryKey;
   const stored = localStorage.getItem(KEY_STORAGE);
   if (!stored) return null;
-  const raw = b64decode(stored);
+  const raw = b64decode(stored).buffer.slice(0) as ArrayBuffer;
   const key = await crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, true, ["encrypt", "decrypt"]);
   inMemoryKey = key;
   return key;
