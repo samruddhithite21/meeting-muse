@@ -89,10 +89,11 @@ export function getStoredFingerprint(): string | null {
 export async function encryptText(text: string, key?: CryptoKey): Promise<{ ciphertext: string; iv: string }> {
   const k = key ?? (await loadStoredKey());
   if (!k) throw new Error("Encryption key not unlocked");
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ivBytes = crypto.getRandomValues(new Uint8Array(12));
   const enc = new TextEncoder().encode(text);
+  const iv = ivBytes.buffer.slice(0) as ArrayBuffer;
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, enc);
-  return { ciphertext: b64encode(ct), iv: b64encode(iv.buffer) };
+  return { ciphertext: b64encode(ct), iv: b64encode(iv) };
 }
 
 export async function decryptText(ciphertext: string, iv: string, key?: CryptoKey): Promise<string> {
@@ -100,7 +101,11 @@ export async function decryptText(ciphertext: string, iv: string, key?: CryptoKe
   if (!k) throw new Error("Encryption key not unlocked");
   const ct = b64decode(ciphertext);
   const ivBuf = b64decode(iv);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ivBuf }, k, ct);
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: ivBuf.buffer.slice(0) as ArrayBuffer },
+    k,
+    ct.buffer.slice(0) as ArrayBuffer,
+  );
   return new TextDecoder().decode(pt);
 }
 
@@ -109,9 +114,10 @@ export async function encryptBlob(blob: Blob, key?: CryptoKey): Promise<{ blob: 
   if (!k) throw new Error("Encryption key not unlocked");
   const ab = await blob.arrayBuffer();
   const hash = await sha256Hex(ab);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ivBytes = crypto.getRandomValues(new Uint8Array(12));
+  const iv = ivBytes.buffer.slice(0) as ArrayBuffer;
   const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, ab);
-  return { blob: new Blob([ct]), iv: b64encode(iv.buffer), hash };
+  return { blob: new Blob([ct]), iv: b64encode(iv), hash };
 }
 
 export async function decryptBlob(blob: Blob, iv: string, mime: string, key?: CryptoKey): Promise<Blob> {
@@ -119,6 +125,10 @@ export async function decryptBlob(blob: Blob, iv: string, mime: string, key?: Cr
   if (!k) throw new Error("Encryption key not unlocked");
   const ab = await blob.arrayBuffer();
   const ivBuf = b64decode(iv);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: ivBuf }, k, ab);
+  const pt = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: ivBuf.buffer.slice(0) as ArrayBuffer },
+    k,
+    ab,
+  );
   return new Blob([pt], { type: mime });
 }
