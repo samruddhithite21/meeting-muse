@@ -1,7 +1,7 @@
-// Prompts and helpers for sending transcript context to Ollama
-// for rolling summaries, action item extraction, and unresolved-topic detection.
+// Prompts and helpers for transcript intelligence.
+// Routes through the active provider (cloud edge function OR local Ollama).
 
-import { ollamaJSON, ollamaGenerate } from "./aiClient";
+import { ollamaJSON, ollamaGenerate, runLLMExtract, runLLMSummary, getAIConfig } from "./aiClient";
 
 export const SYSTEM_BASE =
   "You are an extremely precise meeting intelligence assistant. " +
@@ -15,7 +15,25 @@ export interface ExtractedItems {
   topics: string[];
 }
 
-export async function extractItems(transcriptWithTimes: string, vocabulary: string[], language: string): Promise<ExtractedItems> {
+const EMPTY: ExtractedItems = { decisions: [], tasks: [], open_questions: [], topics: [] };
+
+export async function extractItems(
+  transcriptWithTimes: string,
+  vocabulary: string[],
+  language: string,
+): Promise<ExtractedItems> {
+  const cfg = await getAIConfig();
+  if (cfg.ai_provider === "cloud") {
+    try {
+      const data = await runLLMExtract(transcriptWithTimes, vocabulary, language);
+      return data ?? EMPTY;
+    } catch (e) {
+      console.error("[extractItems cloud]", e);
+      throw e;
+    }
+  }
+
+  // local Ollama
   const vocabHint = vocabulary.length ? `Known names/terms: ${vocabulary.slice(0, 200).join(", ")}.` : "";
   const sys = `${SYSTEM_BASE} ${vocabHint} Output strict JSON only.`;
   const prompt = `Language: ${language}.
@@ -41,18 +59,27 @@ ${transcriptWithTimes}`;
       open_questions: Array.isArray(json.open_questions) ? json.open_questions : [],
       topics: Array.isArray(json.topics) ? json.topics : [],
     };
-  } catch {
-    return { decisions: [], tasks: [], open_questions: [], topics: [] };
+  } catch (e) {
+    console.error("[extractItems local]", e);
+    throw e;
   }
 }
 
 export async function rollingSummary(transcriptWithTimes: string, language: string): Promise<string> {
+  const cfg = await getAIConfig();
+  if (cfg.ai_provider === "cloud") {
+    return (await runLLMSummary(transcriptWithTimes, language)) ?? "";
+  }
   const sys = `${SYSTEM_BASE} Write a concise rolling summary (5-8 bullet points max) in ${language === "hi" ? "Hindi" : "English"}.`;
   const prompt = `Summarize the meeting so far. Bullets only. Be concrete.\n\n${transcriptWithTimes}`;
   return await ollamaGenerate(prompt, { system: sys, temperature: 0.2 });
 }
 
 export async function finalSummary(transcriptWithTimes: string, language: string): Promise<string> {
+  const cfg = await getAIConfig();
+  if (cfg.ai_provider === "cloud") {
+    return (await runLLMSummary(transcriptWithTimes, language)) ?? "";
+  }
   const sys = `${SYSTEM_BASE} Produce a polished post-meeting brief in ${language === "hi" ? "Hindi" : "English"}.`;
   const prompt = `Generate a final brief with sections: Overview (2-3 lines), Key points (bullets), Outcomes, Next steps.\n\n${transcriptWithTimes}`;
   return await ollamaGenerate(prompt, { system: sys, temperature: 0.3 });

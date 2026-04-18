@@ -36,6 +36,8 @@ export default function LiveMeeting() {
   const lastShotRef = useRef<{ phash: string; ts: number } | null>(null);
   const aiTickRef = useRef<number>(0);
   const vocabRef = useRef<string[]>([]);
+  const transcribeErrorShownRef = useRef(false);
+  const aiErrorShownRef = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -114,7 +116,14 @@ export default function LiveMeeting() {
               refreshAI();
             }
           } catch (e: any) {
-            console.warn("transcribe failed", e);
+            console.error("transcribe failed", e);
+            if (!transcribeErrorShownRef.current) {
+              transcribeErrorShownRef.current = true;
+              toast.error(`Transcription failed: ${e.message ?? e}`, {
+                description: "Check Settings → AI provider. Subsequent failures are silenced.",
+                duration: 8000,
+              });
+            }
           }
         },
         onError: (e) => toast.error(e.message),
@@ -134,18 +143,30 @@ export default function LiveMeeting() {
   }
 
   async function refreshAI() {
-    try {
-      const transcriptText = segments.concat([]).map((s) => `[${fmtTime(s.start_ms)}] ${s.speaker}: ${s.text}`).join("\n");
-      if (!transcriptText) return;
-      const [sum, items] = await Promise.all([
-        rollingSummary(transcriptText, language).catch(() => ""),
-        extractItems(transcriptText, vocabRef.current, language).catch(() => null),
-      ]);
-      if (sum) setSummary(sum);
-      if (items) {
-        setTasks(items.tasks.map((t) => ({ title: t.title, assignee: t.assignee, ts: t.timestamp_ms })));
-      }
-    } catch {}
+    const transcriptText = segments.concat([]).map((s) => `[${fmtTime(s.start_ms)}] ${s.speaker}: ${s.text}`).join("\n");
+    if (!transcriptText) return;
+    const [sum, items] = await Promise.all([
+      rollingSummary(transcriptText, language).catch((e) => {
+        console.error("[summary]", e);
+        if (!aiErrorShownRef.current) {
+          aiErrorShownRef.current = true;
+          toast.error(`AI summary failed: ${e.message ?? e}`, { duration: 8000 });
+        }
+        return "";
+      }),
+      extractItems(transcriptText, vocabRef.current, language).catch((e) => {
+        console.error("[extract]", e);
+        if (!aiErrorShownRef.current) {
+          aiErrorShownRef.current = true;
+          toast.error(`Task extraction failed: ${e.message ?? e}`, { duration: 8000 });
+        }
+        return null;
+      }),
+    ]);
+    if (sum) setSummary(sum);
+    if (items) {
+      setTasks(items.tasks.map((t) => ({ title: t.title, assignee: t.assignee, ts: t.timestamp_ms })));
+    }
   }
 
   async function stop() {
@@ -218,7 +239,7 @@ export default function LiveMeeting() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-display font-semibold tracking-tight">Live meeting</h1>
-          <p className="text-sm text-muted-foreground mt-1">Capture mic + an optional shared tab. Transcription streams to your local Whisper.</p>
+          <p className="text-sm text-muted-foreground mt-1">Capture mic + an optional shared tab. Transcribed via your chosen AI provider (Settings).</p>
         </div>
         {recording && (
           <div className="flex items-center gap-3">

@@ -484,6 +484,7 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          ai_provider: string
           email_digest: boolean
           encryption_key_fingerprint: string | null
           leadership_mode: boolean
@@ -495,6 +496,7 @@ export type Database = {
           whisper_url: string
         }
         Insert: {
+          ai_provider?: string
           email_digest?: boolean
           encryption_key_fingerprint?: string | null
           leadership_mode?: boolean
@@ -506,6 +508,7 @@ export type Database = {
           whisper_url?: string
         }
         Update: {
+          ai_provider?: string
           email_digest?: boolean
           encryption_key_fingerprint?: string | null
           leadership_mode?: boolean
