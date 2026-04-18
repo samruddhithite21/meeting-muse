@@ -47,7 +47,9 @@ Deno.serve(async (req) => {
           content:
             "You are a precise speech-to-text engine. Transcribe the audio verbatim. " +
             "Do not summarize, translate, or add commentary. Output ONLY the transcript text. " +
-            "If the audio is silent or unintelligible, output an empty string.",
+            "CRITICAL: If the audio contains no speech (silence, music, tones, noise, or unintelligible sound), " +
+            "output exactly the empty string. Never invent or hallucinate words that are not clearly spoken. " +
+            "Never describe the audio.",
         },
         {
           role: "user",
