@@ -1,7 +1,11 @@
 // Cloud extraction of tasks/decisions/questions/topics + rolling summary.
 // Uses Lovable AI Gateway (Gemini Flash, free tier).
 
-import { corsHeaders } from "@supabase/supabase-js/cors";
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const MODEL = "google/gemini-2.5-flash";
