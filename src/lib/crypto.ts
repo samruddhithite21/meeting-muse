@@ -20,9 +20,14 @@ function b64decode(s: string): Uint8Array {
 }
 
 export async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
-  const buf = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
-  const hashBuf = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  const ab: ArrayBuffer =
+    typeof data === "string"
+      ? (new TextEncoder().encode(data).buffer.slice(0) as ArrayBuffer)
+      : data;
+  const hashBuf = await crypto.subtle.digest("SHA-256", ab);
+  return Array.from(new Uint8Array(hashBuf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export async function deriveKey(passphrase: string, saltStr = "ami-salt-v1"): Promise<CryptoKey> {
