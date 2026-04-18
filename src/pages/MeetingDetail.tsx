@@ -91,7 +91,7 @@ export default function MeetingDetail() {
   }
 
   async function updateTaskStatus(taskId: string, status: string) {
-    await supabase.from("tasks").update({ status }).eq("id", taskId);
+    await supabase.from("tasks").update({ status: status as any }).eq("id", taskId);
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)));
   }
 
