@@ -239,7 +239,7 @@ export default function LiveMeeting() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-display font-semibold tracking-tight">Live meeting</h1>
-          <p className="text-sm text-muted-foreground mt-1">Capture mic + an optional shared tab. Transcription streams to your local Whisper.</p>
+          <p className="text-sm text-muted-foreground mt-1">Capture mic + an optional shared tab. Transcribed via your chosen AI provider (Settings).</p>
         </div>
         {recording && (
           <div className="flex items-center gap-3">
