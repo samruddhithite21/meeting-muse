@@ -35,7 +35,7 @@ export default function LiveMeeting() {
   const [elapsed, setElapsed] = useState(0);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [summary, setSummary] = useState("");
-  const [tasks, setTasks] = useState<{ title: string; assignee?: string; ts?: number }[]>([]);
+  const [tasks, setTasks] = useState<LiveTask[]>([]);
   const [shotCount, setShotCount] = useState(0);
   const handlesRef = useRef<RecorderHandles | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
