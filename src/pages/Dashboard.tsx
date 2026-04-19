@@ -9,6 +9,7 @@ import { Mic, ListChecks, AlertCircle, CheckCircle2, Clock, TrendingDown, Plus, 
 import { decryptText } from "@/lib/crypto";
 import { useAuth } from "@/hooks/useAuth";
 import { QuickEndMeetingButton } from "@/components/EndMeetingButton";
+import { DeleteMeetingButton } from "@/components/DeleteMeetingButton";
 
 type TaskRow = {
   id: string; title: string; status: string; due_date: string | null;
@@ -201,6 +202,10 @@ export default function Dashboard() {
                         onEnded={() => setMeetings((prev) => prev.map((x) => x.id === m.id ? { ...x, status: "completed" } : x))}
                       />
                     )}
+                    <DeleteMeetingButton
+                      meetingId={m.id}
+                      onDeleted={() => setMeetings((prev) => prev.filter((x) => x.id !== m.id))}
+                    />
                   </div>
                 </Link>
               ))}

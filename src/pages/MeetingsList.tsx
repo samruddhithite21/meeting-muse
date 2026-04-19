@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { fmtDuration, fmtRelative } from "@/lib/format";
 import { Mic, Plus } from "lucide-react";
+import { QuickEndMeetingButton } from "@/components/EndMeetingButton";
+import { DeleteMeetingButton } from "@/components/DeleteMeetingButton";
 
 type Row = { id: string; title: string; status: string; started_at: string | null; duration_seconds: number | null; is_leadership: boolean };
 
@@ -40,22 +42,32 @@ export default function MeetingsList() {
       ) : (
         <div className="grid gap-2">
           {items.map((m) => (
-            <Link key={m.id} to={`/meetings/${m.id}`}>
-              <Card className="border-border/60 hover:border-primary/40 transition-colors">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate flex items-center gap-2">
-                      {m.title}
-                      {m.is_leadership && <Badge variant="outline" className="text-[10px]">leadership</Badge>}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {m.started_at ? fmtRelative(m.started_at) : "scheduled"} · {fmtDuration(m.duration_seconds)}
-                    </div>
+            <Card key={m.id} className="border-border/60 hover:border-primary/40 transition-colors">
+              <CardContent className="p-4 flex items-center justify-between gap-3">
+                <Link to={`/meetings/${m.id}`} className="min-w-0 flex-1">
+                  <div className="font-medium truncate flex items-center gap-2">
+                    {m.title}
+                    {m.is_leadership && <Badge variant="outline" className="text-[10px]">leadership</Badge>}
                   </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {m.started_at ? fmtRelative(m.started_at) : "scheduled"} · {fmtDuration(m.duration_seconds)}
+                  </div>
+                </Link>
+                <div className="flex items-center gap-1.5 shrink-0">
                   <Badge variant={m.status === "completed" ? "secondary" : m.status === "live" ? "destructive" : "outline"}>{m.status}</Badge>
-                </CardContent>
-              </Card>
-            </Link>
+                  {m.status === "live" && (
+                    <QuickEndMeetingButton
+                      meetingId={m.id}
+                      onEnded={() => setItems((prev) => prev.map((x) => x.id === m.id ? { ...x, status: "completed" } : x))}
+                    />
+                  )}
+                  <DeleteMeetingButton
+                    meetingId={m.id}
+                    onDeleted={() => setItems((prev) => prev.filter((x) => x.id !== m.id))}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
