@@ -202,6 +202,10 @@ export default function Dashboard() {
                         onEnded={() => setMeetings((prev) => prev.map((x) => x.id === m.id ? { ...x, status: "completed" } : x))}
                       />
                     )}
+                    <DeleteMeetingButton
+                      meetingId={m.id}
+                      onDeleted={() => setMeetings((prev) => prev.filter((x) => x.id !== m.id))}
+                    />
                   </div>
                 </Link>
               ))}
