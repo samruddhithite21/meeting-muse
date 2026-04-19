@@ -9,14 +9,20 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Mic, Square, Loader2, Image as ImageIcon, Sparkles } from "lucide-react";
+import { Mic, Square, Loader2, Image as ImageIcon, Sparkles, Zap } from "lucide-react";
 import { startMeetingCapture, captureFrame, hammingDistance, type RecorderHandles } from "@/lib/recorder";
 import { transcribe } from "@/lib/aiClient";
 import { extractItems, rollingSummary } from "@/lib/aiPrompts";
 import { encryptText, encryptBlob, sha256Hex } from "@/lib/crypto";
 import { fmtTime } from "@/lib/format";
+import { detectKeywordTasks } from "@/lib/keywordTasks";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Segment = { start_ms: number; end_ms: number; text: string; speaker: string };
+type LiveTask = { title: string; assignee?: string; ts?: number; thumbnail?: string; source: "keyword" | "ai" };
 
 export default function LiveMeeting() {
   const nav = useNavigate();
@@ -29,7 +35,7 @@ export default function LiveMeeting() {
   const [elapsed, setElapsed] = useState(0);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [summary, setSummary] = useState("");
-  const [tasks, setTasks] = useState<{ title: string; assignee?: string; ts?: number }[]>([]);
+  const [tasks, setTasks] = useState<LiveTask[]>([]);
   const [shotCount, setShotCount] = useState(0);
   const handlesRef = useRef<RecorderHandles | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -103,6 +109,27 @@ export default function LiveMeeting() {
             if (!text) return;
             const seg: Segment = { start_ms: startMs, end_ms: endMs, text, speaker: "Mic" };
             setSegments((prev) => [...prev, seg]);
+
+            // === Keyword task trigger (instant, no LLM round-trip) ===
+            const kwTasks = detectKeywordTasks(text);
+            if (kwTasks.length) {
+              let thumb: string | undefined;
+              const vidEl = handlesRef.current?.videoEl;
+              if (vidEl) {
+                const f = await captureFrame(vidEl, 320).catch(() => null);
+                if (f) thumb = await blobToDataUrl(f.blob).catch(() => undefined);
+              }
+              setTasks((prev) => [
+                ...kwTasks.map((kt) => ({
+                  title: kt.title, assignee: kt.assignee, ts: startMs, thumbnail: thumb, source: "keyword" as const,
+                })),
+                ...prev,
+              ]);
+              toast.success(`Task captured${kwTasks[0].assignee ? ` · ${kwTasks[0].assignee}` : ""}`, {
+                description: kwTasks[0].title,
+              });
+            }
+
             // store encrypted segment
             const { ciphertext, iv } = await encryptText(text);
             const hash = await sha256Hex(text);
@@ -165,7 +192,17 @@ export default function LiveMeeting() {
     ]);
     if (sum) setSummary(sum);
     if (items) {
-      setTasks(items.tasks.map((t) => ({ title: t.title, assignee: t.assignee, ts: t.timestamp_ms })));
+      // Merge AI-extracted tasks WITHOUT clobbering keyword-triggered ones.
+      setTasks((prev) => {
+        const keywordTasks = prev.filter((t) => t.source === "keyword");
+        const aiTasks: LiveTask[] = items.tasks.map((t) => ({
+          title: t.title, assignee: t.assignee, ts: t.timestamp_ms, source: "ai" as const,
+        }));
+        // de-dupe AI tasks that already match a keyword task title
+        const kwTitles = new Set(keywordTasks.map((t) => t.title.toLowerCase()));
+        const filteredAi = aiTasks.filter((t) => !kwTitles.has(t.title.toLowerCase()));
+        return [...keywordTasks, ...filteredAi];
+      });
     }
   }
 
@@ -353,16 +390,27 @@ export default function LiveMeeting() {
                 {tasks.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">None yet</p>
                 ) : (
-                  <ul className="space-y-2 text-sm">
+                  <ul className="space-y-3 text-sm">
                     {tasks.map((t, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-primary mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                        <div className="flex-1">
-                          <div>{t.title}</div>
+                      <li key={i} className="flex gap-3">
+                        {t.thumbnail ? (
+                          <img src={t.thumbnail} alt="" className="h-12 w-16 object-cover rounded border border-border/60 shrink-0" />
+                        ) : (
+                          <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-1.5">
+                            <span className="flex-1">{t.title}</span>
+                            {t.source === "keyword" && (
+                              <Badge variant="outline" className="text-[9px] shrink-0 gap-0.5 px-1.5 py-0 h-4">
+                                <Zap className="h-2.5 w-2.5" />trigger
+                              </Badge>
+                            )}
+                          </div>
                           {(t.assignee || t.ts != null) && (
-                            <div className="text-xs text-muted-foreground">
-                              {t.assignee && <span>{t.assignee}</span>}
-                              {t.ts != null && <span> · {fmtTime(t.ts)}</span>}
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {t.assignee && <span className="font-medium text-foreground/80">{t.assignee}</span>}
+                              {t.ts != null && <span>{t.assignee ? " · " : ""}{fmtTime(t.ts)}</span>}
                             </div>
                           )}
                         </div>
@@ -373,12 +421,40 @@ export default function LiveMeeting() {
               </CardContent>
             </Card>
 
-            <Button variant="danger" size="lg" onClick={stop} disabled={stopping} className="w-full">
-              {stopping ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Square className="h-4 w-4 mr-2" />Stop & process</>}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="danger" size="lg" disabled={stopping} className="w-full">
+                  {stopping ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Processing…</> : <><Square className="h-4 w-4 mr-2" />End meeting</>}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>End the meeting and generate the summary?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Recording will stop, the audio will be encrypted &amp; uploaded, and the AI will produce a final brief
+                    along with tasks, decisions, and open questions.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep recording</AlertDialogCancel>
+                  <AlertDialogAction onClick={stop} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    End &amp; process
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       )}
     </div>
   );
+}
+
+async function blobToDataUrl(b: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(b);
+  });
 }
