@@ -9,14 +9,20 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Mic, Square, Loader2, Image as ImageIcon, Sparkles } from "lucide-react";
+import { Mic, Square, Loader2, Image as ImageIcon, Sparkles, Zap } from "lucide-react";
 import { startMeetingCapture, captureFrame, hammingDistance, type RecorderHandles } from "@/lib/recorder";
 import { transcribe } from "@/lib/aiClient";
 import { extractItems, rollingSummary } from "@/lib/aiPrompts";
 import { encryptText, encryptBlob, sha256Hex } from "@/lib/crypto";
 import { fmtTime } from "@/lib/format";
+import { detectKeywordTasks } from "@/lib/keywordTasks";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Segment = { start_ms: number; end_ms: number; text: string; speaker: string };
+type LiveTask = { title: string; assignee?: string; ts?: number; thumbnail?: string; source: "keyword" | "ai" };
 
 export default function LiveMeeting() {
   const nav = useNavigate();
