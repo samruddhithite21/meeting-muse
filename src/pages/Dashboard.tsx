@@ -8,6 +8,7 @@ import { fmtRelative, fmtDuration } from "@/lib/format";
 import { Mic, ListChecks, AlertCircle, CheckCircle2, Clock, TrendingDown, Plus, ArrowRight } from "lucide-react";
 import { decryptText } from "@/lib/crypto";
 import { useAuth } from "@/hooks/useAuth";
+import { QuickEndMeetingButton } from "@/components/EndMeetingButton";
 
 type TaskRow = {
   id: string; title: string; status: string; due_date: string | null;
@@ -182,8 +183,8 @@ export default function Dashboard() {
                   </Button>
                 </Link>
               ) : meetings.map((m) => (
-                <Link key={m.id} to={`/meetings/${m.id}`} className="flex items-center justify-between p-2.5 rounded-md hover:bg-muted/40 transition-colors">
-                  <div className="min-w-0">
+                <Link key={m.id} to={`/meetings/${m.id}`} className="flex items-center justify-between p-2.5 rounded-md hover:bg-muted/40 transition-colors gap-2">
+                  <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate flex items-center gap-2">
                       {m.title}
                       {m.is_leadership && <Badge variant="outline" className="text-[10px]">leadership</Badge>}
@@ -192,7 +193,15 @@ export default function Dashboard() {
                       {m.started_at ? fmtRelative(m.started_at) : "scheduled"} · {fmtDuration(m.duration_seconds)}
                     </div>
                   </div>
-                  <MeetingStatusBadge status={m.status} />
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <MeetingStatusBadge status={m.status} />
+                    {m.status === "live" && (
+                      <QuickEndMeetingButton
+                        meetingId={m.id}
+                        onEnded={() => setMeetings((prev) => prev.map((x) => x.id === m.id ? { ...x, status: "completed" } : x))}
+                      />
+                    )}
+                  </div>
                 </Link>
               ))}
             </CardContent>
