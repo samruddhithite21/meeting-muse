@@ -109,6 +109,27 @@ export default function LiveMeeting() {
             if (!text) return;
             const seg: Segment = { start_ms: startMs, end_ms: endMs, text, speaker: "Mic" };
             setSegments((prev) => [...prev, seg]);
+
+            // === Keyword task trigger (instant, no LLM round-trip) ===
+            const kwTasks = detectKeywordTasks(text);
+            if (kwTasks.length) {
+              let thumb: string | undefined;
+              const vidEl = handlesRef.current?.videoEl;
+              if (vidEl) {
+                const f = await captureFrame(vidEl, 320).catch(() => null);
+                if (f) thumb = await blobToDataUrl(f.blob).catch(() => undefined);
+              }
+              setTasks((prev) => [
+                ...kwTasks.map((kt) => ({
+                  title: kt.title, assignee: kt.assignee, ts: startMs, thumbnail: thumb, source: "keyword" as const,
+                })),
+                ...prev,
+              ]);
+              toast.success(`Task captured${kwTasks[0].assignee ? ` · ${kwTasks[0].assignee}` : ""}`, {
+                description: kwTasks[0].title,
+              });
+            }
+
             // store encrypted segment
             const { ciphertext, iv } = await encryptText(text);
             const hash = await sha256Hex(text);
