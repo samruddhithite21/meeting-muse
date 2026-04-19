@@ -184,8 +184,8 @@ export default function Dashboard() {
                   </Button>
                 </Link>
               ) : meetings.map((m) => (
-                <Link key={m.id} to={`/meetings/${m.id}`} className="flex items-center justify-between p-2.5 rounded-md hover:bg-muted/40 transition-colors gap-2">
-                  <div className="min-w-0 flex-1">
+                <div key={m.id} className="flex items-center justify-between p-2.5 rounded-md hover:bg-muted/40 transition-colors gap-2">
+                  <Link to={`/meetings/${m.id}`} className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate flex items-center gap-2">
                       {m.title}
                       {m.is_leadership && <Badge variant="outline" className="text-[10px]">leadership</Badge>}
@@ -193,7 +193,7 @@ export default function Dashboard() {
                     <div className="text-xs text-muted-foreground">
                       {m.started_at ? fmtRelative(m.started_at) : "scheduled"} · {fmtDuration(m.duration_seconds)}
                     </div>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <MeetingStatusBadge status={m.status} />
                     {m.status === "live" && (
@@ -207,7 +207,7 @@ export default function Dashboard() {
                       onDeleted={() => setMeetings((prev) => prev.filter((x) => x.id !== m.id))}
                     />
                   </div>
-                </Link>
+                </div>
               ))}
             </CardContent>
           </Card>
